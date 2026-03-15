@@ -251,6 +251,7 @@ const Dashboard: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
             business_type: lead.business_type,
             meeting_time: lead.meeting_time,
             attendance_status: newStatus,
+            calendarLink: "https://branch-control-system.sirahagents.com/",
           }),
         }).catch((e) => console.error("Webhook error:", e));
       }
