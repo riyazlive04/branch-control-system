@@ -63,9 +63,9 @@ const HeroSection = () => {
     <section className="relative min-h-screen flex items-center section-padding pt-20 md:pt-32 overflow-hidden">
       {/* Animated background elements */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-20 right-10 w-72 h-72 rounded-full bg-teal/5 animate-float-slow" />
-        <div className="absolute bottom-20 left-10 w-56 h-56 rounded-full bg-health-blue/5 animate-float-reverse" />
-        <div className="absolute top-1/2 left-1/3 w-40 h-40 rounded-full bg-health-green/5 animate-float" />
+        <div className="absolute top-20 right-0 w-48 md:w-72 h-48 md:h-72 rounded-full bg-teal/5 animate-float-slow" />
+        <div className="absolute bottom-20 left-0 w-40 md:w-56 h-40 md:h-56 rounded-full bg-health-blue/5 animate-float-reverse" />
+        <div className="absolute top-1/2 left-1/4 w-32 md:w-40 h-32 md:h-40 rounded-full bg-health-green/5 animate-float" />
       </div>
 
       <div className="container-narrow grid lg:grid-cols-2 gap-12 lg:gap-16 items-center relative">

@@ -15,7 +15,7 @@ const AuthoritySection = () => {
   const inView = useInView(ref, { once: true, margin: "-50px" });
 
   return (
-    <section ref={ref} className="section-padding section-alt">
+    <section ref={ref} className="section-padding section-alt overflow-hidden">
       <div className="container-narrow">
         <motion.h2
           initial={{ opacity: 0, y: 30 }}
@@ -27,7 +27,7 @@ const AuthoritySection = () => {
 
         <div className="grid md:grid-cols-2 gap-8 md:gap-12 items-center">
           <motion.div
-            initial={{ opacity: 0, x: -40 }}
+            initial={{ opacity: 0, x: -20 }}
             animate={inView ? { opacity: 1, x: 0 } : {}}
             transition={{ delay: 0.2, type: "spring" }}
           >
@@ -63,7 +63,7 @@ const AuthoritySection = () => {
           </motion.div>
 
           <motion.div
-            initial={{ opacity: 0, x: 40 }}
+            initial={{ opacity: 0, x: 20 }}
             animate={inView ? { opacity: 1, x: 0 } : {}}
             transition={{ delay: 0.4, type: "spring" }}
           >

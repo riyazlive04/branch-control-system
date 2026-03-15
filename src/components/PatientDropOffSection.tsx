@@ -20,7 +20,7 @@ const PatientDropOffSection = () => {
   const inView = useInView(ref, { once: true, margin: "-80px" });
 
   return (
-    <section ref={ref} className="section-padding">
+    <section ref={ref} className="section-padding overflow-hidden">
       <div className="container-narrow">
         <motion.div
           initial={{ opacity: 0, y: 30 }}
@@ -42,7 +42,7 @@ const PatientDropOffSection = () => {
         <div className="grid lg:grid-cols-2 gap-6 lg:gap-12 items-center">
           {/* Funnel Journey Diagram */}
           <motion.div
-            initial={{ opacity: 0, x: -30 }}
+            initial={{ opacity: 0, x: -15 }}
             animate={inView ? { opacity: 1, x: 0 } : {}}
             transition={{ delay: 0.2 }}
             className="glass-card"
@@ -100,7 +100,7 @@ const PatientDropOffSection = () => {
 
           {/* Analysis Points */}
           <motion.div
-            initial={{ opacity: 0, x: 30 }}
+            initial={{ opacity: 0, x: 15 }}
             animate={inView ? { opacity: 1, x: 0 } : {}}
             transition={{ delay: 0.4 }}
           >

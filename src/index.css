@@ -239,8 +239,12 @@ html {
   scroll-behavior: smooth;
 }
 
-/* Mobile: prevent horizontal overflow */
-body {
+/* Prevent horizontal overflow */
+html, body {
+  overflow-x: hidden;
+  width: 100%;
+}
+#root {
   overflow-x: hidden;
 }
 

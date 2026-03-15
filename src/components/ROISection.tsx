@@ -28,7 +28,7 @@ const ROISection = () => {
   const areaPath = `${linePath} L ${points[points.length - 1].x} ${chartHeight - 20} L ${points[0].x} ${chartHeight - 20} Z`;
 
   return (
-    <section ref={ref} className="section-padding">
+    <section ref={ref} className="section-padding overflow-hidden">
       <div className="container-narrow text-center">
         <motion.div
           initial={{ opacity: 0, y: 30 }}

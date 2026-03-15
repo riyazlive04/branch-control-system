@@ -3,10 +3,10 @@ import { useRef } from "react";
 import { MessageSquare, FileSpreadsheet, Phone, FileText, AlertTriangle } from "lucide-react";
 
 const chaosItems = [
-  { icon: MessageSquare, label: "WhatsApp Reports", rotation: -12, x: -40, y: -20 },
-  { icon: FileSpreadsheet, label: "Excel Tracking", rotation: 8, x: 60, y: 30 },
-  { icon: Phone, label: "Phone Follow-ups", rotation: -5, x: -30, y: 60 },
-  { icon: FileText, label: "Manual Reports", rotation: 15, x: 50, y: -40 },
+  { icon: MessageSquare, label: "WhatsApp Reports", rotation: -12, x: -30, y: -20 },
+  { icon: FileSpreadsheet, label: "Excel Tracking", rotation: 8, x: 40, y: 30 },
+  { icon: Phone, label: "Phone Follow-ups", rotation: -5, x: -25, y: 60 },
+  { icon: FileText, label: "Manual Reports", rotation: 15, x: 35, y: -40 },
 ];
 
 const ProblemSection = () => {
@@ -65,8 +65,8 @@ const ProblemSection = () => {
               animate={inView ? {
                 opacity: 1,
                 scale: 1,
-                x: item.x * (typeof window !== 'undefined' && window.innerWidth < 768 ? 1.5 : 2.5),
-                y: item.y * (typeof window !== 'undefined' && window.innerWidth < 768 ? 1.5 : 2),
+                x: item.x * (typeof window !== 'undefined' && window.innerWidth < 768 ? 1.2 : 2.5),
+                y: item.y * (typeof window !== 'undefined' && window.innerWidth < 768 ? 1.2 : 2),
                 rotate: item.rotation,
               } : {}}
               transition={{ delay: 0.3 + i * 0.2, duration: 0.8, type: "spring" }}

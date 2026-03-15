@@ -365,7 +365,7 @@ const BookingCalendar: React.FC = () => {
   // ─── Render ────────────────────────────────────────────────────────────────
 
   return (
-    <section id="consultation" className="section-padding section-alt">
+    <section id="consultation" className="section-padding section-alt overflow-hidden">
       <div className="container-narrow">
 
         {/* Section header */}

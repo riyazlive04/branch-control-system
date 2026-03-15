@@ -86,7 +86,7 @@ const SystemModules = () => {
   const activeIdx = hoveredIdx ?? touchIdx;
 
   return (
-    <section ref={ref} className="section-padding">
+    <section ref={ref} className="section-padding overflow-hidden">
       <div className="container-narrow">
         <motion.h2
           initial={{ opacity: 0, y: 30 }}

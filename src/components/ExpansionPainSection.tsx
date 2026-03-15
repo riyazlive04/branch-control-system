@@ -30,7 +30,7 @@ const ExpansionPainSection = () => {
 
         <div className="grid md:grid-cols-2 gap-6 md:gap-8">
           <motion.div
-            initial={{ opacity: 0, x: -60 }}
+            initial={{ opacity: 0, x: -20 }}
             animate={inView ? { opacity: 1, x: 0 } : {}}
             transition={{ delay: 0.2, duration: 0.7, type: "spring" }}
             className="rounded-2xl border border-destructive/20 bg-destructive/5 p-6 md:p-8 relative overflow-hidden"
@@ -73,7 +73,7 @@ const ExpansionPainSection = () => {
           </motion.div>
 
           <motion.div
-            initial={{ opacity: 0, x: 60 }}
+            initial={{ opacity: 0, x: 20 }}
             animate={inView ? { opacity: 1, x: 0 } : {}}
             transition={{ delay: 0.4, duration: 0.7, type: "spring" }}
             className="rounded-2xl border border-health-green/20 bg-health-green/5 p-6 md:p-8 relative overflow-hidden"

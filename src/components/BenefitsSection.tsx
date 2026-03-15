@@ -15,7 +15,7 @@ const BenefitsSection = () => {
   const inView = useInView(ref, { once: true, margin: "-50px" });
 
   return (
-    <section ref={ref} className="section-padding">
+    <section ref={ref} className="section-padding overflow-hidden">
       <div className="container-narrow">
         <motion.h2
           initial={{ opacity: 0, y: 30 }}

@@ -31,7 +31,7 @@ const BlueprintSection = () => {
   const inView = useInView(ref, { once: true, margin: "-80px" });
 
   return (
-    <section ref={ref} className="section-padding section-alt">
+    <section ref={ref} className="section-padding section-alt overflow-hidden">
       <div className="container-narrow">
         <motion.div
           initial={{ opacity: 0, y: 30 }}

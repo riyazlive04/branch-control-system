@@ -3,12 +3,12 @@ import { useRef } from "react";
 import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Cell } from "recharts";
 
 const revenueData = [
-  { name: "Branch 1", value: 18, fill: "hsl(217, 80%, 56%)" },
-  { name: "Branch 2", value: 14, fill: "hsl(174, 62%, 42%)" },
-  { name: "Branch 3", value: 22, fill: "hsl(160, 55%, 42%)" },
-  { name: "Branch 4", value: 9, fill: "hsl(0, 72%, 51%)" },
-  { name: "Branch 5", value: 16, fill: "hsl(217, 80%, 56%)" },
-  { name: "Branch 6", value: 20, fill: "hsl(174, 62%, 42%)" },
+  { name: "B1", value: 18, fill: "hsl(217, 80%, 56%)" },
+  { name: "B2", value: 14, fill: "hsl(174, 62%, 42%)" },
+  { name: "B3", value: 22, fill: "hsl(160, 55%, 42%)" },
+  { name: "B4", value: 9, fill: "hsl(0, 72%, 51%)" },
+  { name: "B5", value: 16, fill: "hsl(217, 80%, 56%)" },
+  { name: "B6", value: 20, fill: "hsl(174, 62%, 42%)" },
 ];
 
 const rankings = [
