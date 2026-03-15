@@ -338,6 +338,11 @@ const BookingCalendar: React.FC = () => {
       window.open(`https://wa.me/${WHATSAPP_NUMBER}?text=${msg}`, "_blank");
     }
 
+    // Fire Meta Pixel Lead event on successful booking
+    if (typeof window.fbq === "function") {
+      window.fbq("track", "Lead");
+    }
+
     setMeetLink(link);
     setConfirmed(true);
     setSubmitting(false);
