@@ -326,15 +326,14 @@ const BookingCalendar: React.FC = () => {
     // 4. Open WhatsApp with pre-filled confirmation message
     if (WHATSAPP_NUMBER) {
       const msg = encodeURIComponent(
-        `Hi! I've just booked a consultation with Sirah Digital.\n\n` +
-          `📅 Date & Time: ${selectedDate ? format(selectedDate, "MMMM d, yyyy") : ""} at ${selectedSlot.display}\n` +
+        `Hi! I've just booked a *Multi-Branch System Strategy Session* with Sirah Digital.\n\n` +
+          `📅 Date: ${selectedDate ? format(selectedDate, "EEEE, MMMM d, yyyy") : ""}\n` +
+          `⏰ Time: ${selectedSlot.display}\n\n` +
           `👤 Name: ${form.name}\n` +
           `📧 Email: ${form.email}\n` +
-          `📞 Phone: ${form.countryCode} ${form.phone}\n` +
-          `🏢 Business: ${form.businessType}\n` +
-          `🌐 Website: ${form.website}\n` +
-          (link ? `🎥 Meet Link: ${link}\n` : "") +
-          `\nLooking forward to the call!`
+          `📱 Phone: ${form.countryCode} ${form.phone}\n\n` +
+          `🏢 Business Type: ${form.businessType}\n\n` +
+          `Looking forward to the call!`
       );
       window.open(`https://wa.me/${WHATSAPP_NUMBER}?text=${msg}`, "_blank");
     }
