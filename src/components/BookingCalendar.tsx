@@ -45,8 +45,8 @@ interface FormData {
 const WEBHOOK_URL = import.meta.env.VITE_WEBHOOK_URL as string;
 const WHATSAPP_NUMBER = import.meta.env.VITE_WHATSAPP_NUMBER as string;
 
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string;
-const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
+const SUPABASE_URL = "https://lbsiyqbhjatlmqphjitf.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imxic2l5cWJoamF0bG1xcGhqaXRmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI1MzYyMTgsImV4cCI6MjA4ODExMjIxOH0.iWUso735ZmnaqI-WxtlSvhboFFPDMRPzETlCN9wzYDI";
 
 const COUNTRY_CODES = [
   { code: "+91",  country: "India" },
@@ -104,49 +104,107 @@ const BookingCalendar: React.FC = () => {
   const [confirmed, setConfirmed] = useState(false);
   const [meetLink, setMeetLink] = useState("");
 
-  // Client-side slot cache: date string → { slots, timestamp }
-  // TTL: 90 seconds — ensures cross-LP bookings are reflected quickly
-  const CACHE_TTL = 90_000;
-  const cacheRef = useRef<Map<string, { slots: Slot[]; at: number }>>(new Map());
+  const slotCache = useRef<Map<string, Slot[]>>(new Map());
 
   // ─── Fetch helpers ─────────────────────────────────────────────────────────
 
-  // Raw fetch — calls Supabase Edge Function which checks leads table + Google Calendar
-  const fetchSlotsRaw = useCallback(async (dateStr: string): Promise<Slot[]> => {
+  // Local fallback slot generation
+  const generateLocalSlots = (date: Date): Slot[] => {
+    const now = new Date();
+    const dateStr = format(date, "yyyy-MM-dd");
+    const isToday = dateStr === format(now, "yyyy-MM-dd");
+    const slots: Slot[] = [];
+    for (let hour = 10; hour < 19; hour++) {
+      const slotDate = new Date(date.getFullYear(), date.getMonth(), date.getDate(), hour, 0, 0, 0);
+      if (isToday && slotDate <= now) continue;
+      slots.push({
+        dateTime: slotDate.toISOString(),
+        display: slotDate.toLocaleTimeString("en-IN", {
+          hour: "2-digit", minute: "2-digit", hour12: true,
+          timeZone: "Asia/Kolkata",
+        }),
+      });
+    }
+    return slots;
+  };
+
+  // Raw fetch — calls Supabase Edge Function, falls back to local, then filters booked leads
+  const fetchSlotsRaw = useCallback(async (date: Date): Promise<Slot[]> => {
+    const dateStr = format(date, "yyyy-MM-dd");
+    if (slotCache.current.has(dateStr)) {
+      return slotCache.current.get(dateStr)!;
+    }
+
+    // Step 1: Get Google-Calendar-filtered slots from edge function
+    let slots: Slot[] = [];
+    let edgeFunctionWorked = false;
+
     try {
+      const headers: Record<string, string> = { "Content-Type": "application/json" };
+      if (SUPABASE_ANON_KEY) {
+        headers["Authorization"] = `Bearer ${SUPABASE_ANON_KEY}`;
+        headers["apikey"] = SUPABASE_ANON_KEY;
+      }
       const res = await fetch(
         `${SUPABASE_URL}/functions/v1/get-slots?date=${dateStr}`,
-        {
-          headers: {
-            Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
-            "Content-Type": "application/json",
-          },
-        }
+        { headers }
       );
-      if (!res.ok) return [];
       const data = await res.json();
-      return data.success ? data.slots : [];
-    } catch {
-      return [];
+      console.log("[get-slots] response:", data);
+      if (data.success && Array.isArray(data.slots)) {
+        slots = data.slots;
+        edgeFunctionWorked = true;
+      } else {
+        console.warn("[get-slots] returned error:", data.error ?? data);
+      }
+    } catch (err) {
+      console.error("[get-slots] fetch failed:", err);
     }
+
+    // Step 2: Fallback to local slot generation if edge function failed
+    if (!edgeFunctionWorked) {
+      console.warn("[get-slots] falling back to local slot generation");
+      slots = generateLocalSlots(date);
+    }
+
+    // Step 3: Remove slots already booked in leads table (across ALL LPs)
+    if (slots.length > 0 && supabase) {
+      try {
+        const dayStart = `${dateStr}T00:00:00+05:30`;
+        const dayEnd   = `${dateStr}T23:59:59+05:30`;
+
+        const { data: booked } = await supabase
+          .from("leads")
+          .select("meeting_time")
+          .gte("meeting_time", dayStart)
+          .lte("meeting_time", dayEnd)
+          .not("meeting_time", "is", null);
+
+        if (booked && booked.length > 0) {
+          const bookedMs = new Set(
+            booked.map((r: { meeting_time: string }) =>
+              new Date(r.meeting_time).getTime()
+            )
+          );
+          slots = slots.filter(
+            (s) => !bookedMs.has(new Date(s.dateTime).getTime())
+          );
+        }
+      } catch (err) {
+        console.error("[leads-filter] query failed:", err);
+      }
+    }
+
+    slotCache.current.set(dateStr, slots);
+    return slots;
   }, []);
 
-  // User-initiated fetch — checks cache first (with TTL), shows spinner if miss
+  // User-initiated fetch — shows spinner while fetching
   const fetchSlots = useCallback(
     async (date: Date) => {
-      const dateStr = format(date, "yyyy-MM-dd");
-      const cached = cacheRef.current.get(dateStr);
-
-      // Cache hit within TTL → instant, no spinner
-      if (cached && Date.now() - cached.at < CACHE_TTL) {
-        setSlots(cached.slots);
-        return;
-      }
-
       setLoadingSlots(true);
       setSlots([]);
-      const data = await fetchSlotsRaw(dateStr);
-      cacheRef.current.set(dateStr, { slots: data, at: Date.now() });
+      const data = await fetchSlotsRaw(date);
       setSlots(data);
       setLoadingSlots(false);
     },
@@ -156,18 +214,13 @@ const BookingCalendar: React.FC = () => {
   // Prefetch next 4 weekdays silently on mount to warm cache
   useEffect(() => {
     const prefetch = async () => {
-      const weekdays: string[] = [];
+      const weekdays: Date[] = [];
       let d = addDays(today, 1);
       while (weekdays.length < 4) {
-        if (!isSunday(d)) weekdays.push(format(d, "yyyy-MM-dd"));
+        if (!isSunday(d)) weekdays.push(d);
         d = addDays(d, 1);
       }
-      await Promise.all(
-        weekdays.map(async (dateStr) => {
-          const data = await fetchSlotsRaw(dateStr);
-          cacheRef.current.set(dateStr, { slots: data, at: Date.now() });
-        })
-      );
+      await Promise.all(weekdays.map((date) => fetchSlotsRaw(date)));
     };
     prefetch();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -189,13 +242,12 @@ const BookingCalendar: React.FC = () => {
           const bookedDate = format(new Date(meetingTime), "yyyy-MM-dd");
 
           // Evict that date from cache so next access re-fetches
-          cacheRef.current.delete(bookedDate);
+          slotCache.current.delete(bookedDate);
 
           // If the user is currently viewing that date, refresh slots silently
           setSelectedDate((current) => {
             if (current && format(current, "yyyy-MM-dd") === bookedDate) {
-              fetchSlotsRaw(bookedDate).then((data) => {
-                cacheRef.current.set(bookedDate, { slots: data, at: Date.now() });
+              fetchSlotsRaw(current).then((data) => {
                 setSlots(data);
                 // If the selected slot was just taken, deselect it
                 setSelectedSlot((s) =>
@@ -277,7 +329,7 @@ const BookingCalendar: React.FC = () => {
         success = true;
         // Evict this date from cache so slot is removed immediately
         const dateStr = format(selectedDate!, "yyyy-MM-dd");
-        cacheRef.current.delete(dateStr);
+        slotCache.current.delete(dateStr);
       }
     } catch {
       // insert failed
