@@ -45,27 +45,8 @@ interface FormData {
 const WEBHOOK_URL = import.meta.env.VITE_WEBHOOK_URL as string;
 const WHATSAPP_NUMBER = import.meta.env.VITE_WHATSAPP_NUMBER as string;
 
-const WORK_START = 10;    // 10:00 AM IST
-const WORK_END = 19;      // 7:00 PM IST
-const SLOT_DURATION = 60; // minutes
-
-function generateDaySlots(dateStr: string): Slot[] {
-  const slots: Slot[] = [];
-  for (let hour = WORK_START; hour < WORK_END; hour++) {
-    if (hour * 60 + SLOT_DURATION <= WORK_END * 60) {
-      const h = hour.toString().padStart(2, "0");
-      const dateTime = `${dateStr}T${h}:00:00+05:30`;
-      const display = new Date(dateTime).toLocaleTimeString("en-IN", {
-        hour: "2-digit",
-        minute: "2-digit",
-        hour12: true,
-        timeZone: "Asia/Kolkata",
-      });
-      slots.push({ dateTime, display });
-    }
-  }
-  return slots;
-}
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string;
+const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
 
 const COUNTRY_CODES = [
   { code: "+91",  country: "India" },
@@ -130,27 +111,21 @@ const BookingCalendar: React.FC = () => {
 
   // ─── Fetch helpers ─────────────────────────────────────────────────────────
 
-  // Raw fetch — generates all day slots then filters out booked ones from leads table
+  // Raw fetch — calls Supabase Edge Function which checks leads table + Google Calendar
   const fetchSlotsRaw = useCallback(async (dateStr: string): Promise<Slot[]> => {
     try {
-      const allSlots = generateDaySlots(dateStr);
-
-      const { data: booked } = await supabase
-        .from("leads")
-        .select("meeting_time")
-        .gte("meeting_time", `${dateStr}T00:00:00+05:30`)
-        .lt("meeting_time", `${dateStr}T23:59:59+05:30`);
-
-      const bookedSet = new Set(
-        (booked || []).map((r) => new Date(r.meeting_time).toISOString())
+      const res = await fetch(
+        `${SUPABASE_URL}/functions/v1/get-slots?date=${dateStr}`,
+        {
+          headers: {
+            Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+            "Content-Type": "application/json",
+          },
+        }
       );
-
-      const now = new Date();
-      return allSlots.filter(
-        (slot) =>
-          new Date(slot.dateTime) > now &&
-          !bookedSet.has(new Date(slot.dateTime).toISOString())
-      );
+      if (!res.ok) return [];
+      const data = await res.json();
+      return data.success ? data.slots : [];
     } catch {
       return [];
     }
