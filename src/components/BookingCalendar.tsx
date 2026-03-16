@@ -19,15 +19,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "sonner";
-import { supabase } from "@/lib/supabase";
+import { getAvailableSlots, createBooking, type Slot } from "@/services/booking";
 import { cn } from "@/lib/utils";
-
-// ─── Types ─────────────────────────────────────────────────────────────────────
-
-interface Slot {
-  dateTime: string;
-  display: string;
-}
 
 interface FormData {
   name: string;
@@ -42,11 +35,7 @@ interface FormData {
 
 // ─── Constants ─────────────────────────────────────────────────────────────────
 
-const WEBHOOK_URL = import.meta.env.VITE_WEBHOOK_URL as string;
 const WHATSAPP_NUMBER = import.meta.env.VITE_WHATSAPP_NUMBER as string;
-
-const SUPABASE_URL = "https://lbsiyqbhjatlmqphjitf.supabase.co";
-const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imxic2l5cWJoamF0bG1xcGhqaXRmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI1MzYyMTgsImV4cCI6MjA4ODExMjIxOH0.iWUso735ZmnaqI-WxtlSvhboFFPDMRPzETlCN9wzYDI";
 
 const COUNTRY_CODES = [
   { code: "+91",  country: "India" },
@@ -108,64 +97,14 @@ const BookingCalendar: React.FC = () => {
 
   // ─── Fetch helpers ─────────────────────────────────────────────────────────
 
-  // Raw fetch — calls Supabase Edge Function, then filters booked leads
+  // Raw fetch — calls shared booking service
   const fetchSlotsRaw = useCallback(async (date: Date): Promise<Slot[]> => {
     const dateStr = format(date, "yyyy-MM-dd");
     if (slotCache.current.has(dateStr)) {
       return slotCache.current.get(dateStr)!;
     }
 
-    // Step 1: Get Google-Calendar-filtered slots from edge function
-    let slots: Slot[] = [];
-
-    try {
-      const headers: Record<string, string> = { "Content-Type": "application/json" };
-      if (SUPABASE_ANON_KEY) {
-        headers["Authorization"] = `Bearer ${SUPABASE_ANON_KEY}`;
-        headers["apikey"] = SUPABASE_ANON_KEY;
-      }
-      const res = await fetch(
-        `${SUPABASE_URL}/functions/v1/get-slots?date=${dateStr}`,
-        { headers }
-      );
-      const data = await res.json();
-      console.log("[get-slots] response:", data);
-      if (data.success && Array.isArray(data.slots)) {
-        slots = data.slots;
-      } else {
-        console.warn("[get-slots] returned error:", data.error ?? data);
-      }
-    } catch (err) {
-      console.error("[get-slots] fetch failed:", err);
-    }
-
-    // Step 3: Remove slots already booked in leads table (across ALL LPs)
-    if (slots.length > 0 && supabase) {
-      try {
-        const dayStart = `${dateStr}T00:00:00+05:30`;
-        const dayEnd   = `${dateStr}T23:59:59+05:30`;
-
-        const { data: booked } = await supabase
-          .from("leads")
-          .select("meeting_time")
-          .gte("meeting_time", dayStart)
-          .lte("meeting_time", dayEnd)
-          .not("meeting_time", "is", null);
-
-        if (booked && booked.length > 0) {
-          const bookedMs = new Set(
-            booked.map((r: { meeting_time: string }) =>
-              new Date(r.meeting_time).getTime()
-            )
-          );
-          slots = slots.filter(
-            (s) => !bookedMs.has(new Date(s.dateTime).getTime())
-          );
-        }
-      } catch (err) {
-        console.error("[leads-filter] query failed:", err);
-      }
-    }
+    const slots = await getAvailableSlots(dateStr);
 
     slotCache.current.set(dateStr, slots);
     return slots;
@@ -198,47 +137,6 @@ const BookingCalendar: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Realtime subscription — evict cache and re-fetch visible date when any
-  // new lead is inserted (from this or any other landing page)
-  useEffect(() => {
-    const channel = supabase
-      .channel("leads-inserts")
-      .on(
-        "postgres_changes",
-        { event: "INSERT", schema: "public", table: "leads" },
-        (payload) => {
-          const meetingTime: string | null =
-            (payload.new as { meeting_time?: string | null }).meeting_time ?? null;
-          if (!meetingTime) return;
-
-          const bookedDate = format(new Date(meetingTime), "yyyy-MM-dd");
-
-          // Evict that date from cache so next access re-fetches
-          slotCache.current.delete(bookedDate);
-
-          // If the user is currently viewing that date, refresh slots silently
-          setSelectedDate((current) => {
-            if (current && format(current, "yyyy-MM-dd") === bookedDate) {
-              fetchSlotsRaw(current).then((data) => {
-                setSlots(data);
-                // If the selected slot was just taken, deselect it
-                setSelectedSlot((s) =>
-                  s && !data.find((d) => d.dateTime === s.dateTime) ? null : s
-                );
-              });
-            }
-            return current;
-          });
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fetchSlotsRaw]);
-
   // ─── Event handlers ────────────────────────────────────────────────────────
 
   const handleDateSelect = (date: Date | undefined) => {
@@ -267,58 +165,27 @@ const BookingCalendar: React.FC = () => {
       name: form.name,
       email: form.email,
       phone: form.phone,
-      country_code: form.countryCode,
       countryCode: form.countryCode,
       businessType: form.businessType,
-      dateTime: selectedSlot.dateTime,
       website: form.website,
       challenge: form.challenge,
       automateProcess: form.automateProcess,
+      dateTime: selectedSlot.dateTime,
     };
 
-    let link = "";
-    let success = false;
+    const result = await createBooking(payload, "Branch Control System");
 
-    // Book meeting via Supabase Edge Function
-    try {
-      const headers: Record<string, string> = { "Content-Type": "application/json" };
-      if (SUPABASE_ANON_KEY) {
-        headers["Authorization"] = `Bearer ${SUPABASE_ANON_KEY}`;
-        headers["apikey"] = SUPABASE_ANON_KEY;
-      }
-      const res = await fetch(
-        `${SUPABASE_URL}/functions/v1/book-meeting`,
-        {
-          method: "POST",
-          headers,
-          body: JSON.stringify({
-            ...payload,
-            lp_name: "Branch Control System",
-            webhookUrl: WEBHOOK_URL || undefined,
-          }),
-        }
-      );
-      const data = await res.json();
-      if (data.success) {
-        link = data.meetLink || "";
-        success = true;
-        // Evict this date from cache so slot is removed immediately
-        const dateStr = format(selectedDate!, "yyyy-MM-dd");
-        slotCache.current.delete(dateStr);
-      } else {
-        console.error("[book-meeting] returned error:", data.error ?? data);
-      }
-    } catch (err) {
-      console.error("[book-meeting] fetch failed:", err);
-    }
-
-    if (!success) {
+    if (!result.success) {
       toast.error("Booking failed. Please try again or contact us directly.");
       setSubmitting(false);
       return;
     }
 
-    // 4. Open WhatsApp with pre-filled confirmation message
+    // Evict this date from cache so slot is removed immediately
+    const dateStr = format(selectedDate!, "yyyy-MM-dd");
+    slotCache.current.delete(dateStr);
+
+    // Open WhatsApp with pre-filled confirmation message
     if (WHATSAPP_NUMBER) {
       const msg = encodeURIComponent(
         `Hi! I've just booked a *Multi-Branch System Strategy Session* with Sirah Digital.\n\n` +
@@ -338,7 +205,7 @@ const BookingCalendar: React.FC = () => {
       window.fbq("track", "Lead");
     }
 
-    setMeetLink(link);
+    setMeetLink(result.meet_link || "");
     setConfirmed(true);
     setSubmitting(false);
   };
