@@ -63,32 +63,35 @@ Deno.serve(async (req) => {
     }
 
     // ── Step 2: Insert lead into leads table ──────────────────────────────
+    const leadRow = {
+      name,
+      email,
+      phone,
+      country_code: countryCode,
+      business_type: businessType,
+      website: website || null,
+      challenge: challenge || null,
+      automate_process: automateProcess || null,
+      meeting_time: dateTime,
+      lp_name: lp_name || null,
+    };
+    console.log("Inserting lead:", JSON.stringify(leadRow));
+
     const { data: lead, error: leadError } = await supabase
       .from("leads")
-      .insert({
-        name,
-        email,
-        phone,
-        country_code: countryCode,
-        business_type: businessType,
-        website: website || null,
-        challenge: challenge || null,
-        automate_process: automateProcess || null,
-        meeting_time: dateTime,
-        lp_name: lp_name || null,
-      })
+      .insert(leadRow)
       .select("id")
       .single();
 
     if (leadError) {
-      console.error("Lead insert error:", leadError);
+      console.error("Lead insert error:", JSON.stringify(leadError));
       // Rollback: release the slot
       await supabase
         .from("calendar_events")
         .update({ status: "available" })
         .eq("id", reserved.id);
       return new Response(
-        JSON.stringify({ success: false, error: "Failed to create lead" }),
+        JSON.stringify({ success: false, error: `Failed to create lead: ${leadError.message}` }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }

@@ -176,7 +176,8 @@ const BookingCalendar: React.FC = () => {
     const result = await createBooking(payload, "Branch Control System");
 
     if (!result.success) {
-      toast.error("Booking failed. Please try again or contact us directly.");
+      console.error("[booking] Error:", result.error);
+      toast.error(result.error || "Booking failed. Please try again or contact us directly.");
       setSubmitting(false);
       return;
     }
