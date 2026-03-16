@@ -108,27 +108,7 @@ const BookingCalendar: React.FC = () => {
 
   // ─── Fetch helpers ─────────────────────────────────────────────────────────
 
-  // Local fallback slot generation
-  const generateLocalSlots = (date: Date): Slot[] => {
-    const now = new Date();
-    const dateStr = format(date, "yyyy-MM-dd");
-    const isToday = dateStr === format(now, "yyyy-MM-dd");
-    const slots: Slot[] = [];
-    for (let hour = 10; hour < 19; hour++) {
-      const slotDate = new Date(date.getFullYear(), date.getMonth(), date.getDate(), hour, 0, 0, 0);
-      if (isToday && slotDate <= now) continue;
-      slots.push({
-        dateTime: slotDate.toISOString(),
-        display: slotDate.toLocaleTimeString("en-IN", {
-          hour: "2-digit", minute: "2-digit", hour12: true,
-          timeZone: "Asia/Kolkata",
-        }),
-      });
-    }
-    return slots;
-  };
-
-  // Raw fetch — calls Supabase Edge Function, falls back to local, then filters booked leads
+  // Raw fetch — calls Supabase Edge Function, then filters booked leads
   const fetchSlotsRaw = useCallback(async (date: Date): Promise<Slot[]> => {
     const dateStr = format(date, "yyyy-MM-dd");
     if (slotCache.current.has(dateStr)) {
@@ -137,7 +117,6 @@ const BookingCalendar: React.FC = () => {
 
     // Step 1: Get Google-Calendar-filtered slots from edge function
     let slots: Slot[] = [];
-    let edgeFunctionWorked = false;
 
     try {
       const headers: Record<string, string> = { "Content-Type": "application/json" };
@@ -153,18 +132,11 @@ const BookingCalendar: React.FC = () => {
       console.log("[get-slots] response:", data);
       if (data.success && Array.isArray(data.slots)) {
         slots = data.slots;
-        edgeFunctionWorked = true;
       } else {
         console.warn("[get-slots] returned error:", data.error ?? data);
       }
     } catch (err) {
       console.error("[get-slots] fetch failed:", err);
-    }
-
-    // Step 2: Fallback to local slot generation if edge function failed
-    if (!edgeFunctionWorked) {
-      console.warn("[get-slots] falling back to local slot generation");
-      slots = generateLocalSlots(date);
     }
 
     // Step 3: Remove slots already booked in leads table (across ALL LPs)
@@ -307,47 +279,43 @@ const BookingCalendar: React.FC = () => {
     let link = "";
     let success = false;
 
-    // Insert lead into Supabase leads table
+    // Book meeting via Supabase Edge Function
     try {
-      const { error } = await supabase.from("leads").insert([
+      const headers: Record<string, string> = { "Content-Type": "application/json" };
+      if (SUPABASE_ANON_KEY) {
+        headers["Authorization"] = `Bearer ${SUPABASE_ANON_KEY}`;
+        headers["apikey"] = SUPABASE_ANON_KEY;
+      }
+      const res = await fetch(
+        `${SUPABASE_URL}/functions/v1/book-meeting`,
         {
-          name: form.name,
-          email: form.email,
-          phone: form.phone,
-          country_code: form.countryCode,
-          business_type: form.businessType,
-          website: form.website || null,
-          challenge: form.challenge || null,
-          automate_process: form.automateProcess || null,
-          meeting_time: selectedSlot.dateTime,
-          meet_link: null,
-          lp_name: "Branch Control System",
-        },
-      ]);
-      if (!error) {
-        link = "https://meet.google.com/rch-shez-jnw";
+          method: "POST",
+          headers,
+          body: JSON.stringify({
+            ...payload,
+            lp_name: "Branch Control System",
+            webhookUrl: WEBHOOK_URL || undefined,
+          }),
+        }
+      );
+      const data = await res.json();
+      if (data.success) {
+        link = data.meetLink || "";
         success = true;
         // Evict this date from cache so slot is removed immediately
         const dateStr = format(selectedDate!, "yyyy-MM-dd");
         slotCache.current.delete(dateStr);
+      } else {
+        console.error("[book-meeting] returned error:", data.error ?? data);
       }
-    } catch {
-      // insert failed
+    } catch (err) {
+      console.error("[book-meeting] fetch failed:", err);
     }
 
     if (!success) {
       toast.error("Booking failed. Please try again or contact us directly.");
       setSubmitting(false);
       return;
-    }
-
-    // 3. Fire webhook (fire-and-forget)
-    if (WEBHOOK_URL) {
-      fetch(WEBHOOK_URL, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...payload, meetLink: link }),
-      }).catch(() => {});
     }
 
     // 4. Open WhatsApp with pre-filled confirmation message
