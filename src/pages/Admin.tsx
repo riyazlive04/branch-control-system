@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { Eye, EyeOff, RefreshCw, LogOut, Loader2 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { formatIST } from "@/utils/formatIST";
 
 // ─── Config ───────────────────────────────────────────────────────────────────
 
@@ -45,17 +46,8 @@ async function sha256Hex(message: string): Promise<string> {
     .join("");
 }
 
-function formatDateTime(iso: string | null): string {
-  if (!iso) return "—";
-  return new Date(iso).toLocaleString("en-IN", {
-    timeZone: "Asia/Kolkata",
-    month: "short",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: true,
-  });
-}
+// formatDateTime delegates to shared IST formatter
+const formatDateTime = formatIST;
 
 function shortId(uuid: string): string {
   return uuid.replace(/-/g, "").slice(0, 5);
