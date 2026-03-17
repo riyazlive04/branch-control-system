@@ -140,7 +140,7 @@ Deno.serve(async (req) => {
               end: { dateTime: endTime.toISOString(), timeZone: "Asia/Kolkata" },
               conferenceData: {
                 createRequest: {
-                  requestId: `booking-${reserved.id}`,
+                  requestId: crypto.randomUUID(),
                   conferenceSolutionKey: { type: "hangoutsMeet" },
                 },
               },
